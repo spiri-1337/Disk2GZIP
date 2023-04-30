@@ -1,0 +1,51 @@
+#! /bin/bash
+
+# function to print synopsis if something went wrong
+function synopsis() {
+    printf '%s <gzip compressed image> [destination file]\n' "${0##*/}"
+}
+
+# error function to display an error message and exits the program with unsuccessful return code
+function die() {
+    printf 'Error: %s\n' "$1" >&2
+    synopsis >&2
+    exit 1
+}
+
+# function to generate a datetime string to append to restored files with filepath collision
+function timestamp() {
+    date "+%Y-%M-%d_%H:%S"
+}
+
+# restore the GZIP-compressed backup to the original file
+function restore(){
+    local backup_filepath restore_filepath
+
+    backup_filepath=$(realpath -- "$1")
+    restore_filepath=$2
+
+    # generate an absolute path for the restore filepath
+    if [[ -z "${restore_filepath}" ]]; then
+        restore_filepath=${backup_filepath%.*}
+    else
+        restore_filepath=$(realpath -- "${restore_filepath}")
+    fi
+
+    # append datetime suffix, if restore_filepath is same as backup_filepath
+    if [[ "${backup_filepath}" == "${restore_filepath}" ]]; then
+        restore_filepath+=_$(timestamp)
+    fi
+
+    # Abort, if the restore filepath location is already taken
+    if [[ -e "${restore_filepath}" ]]; then
+        die "${restore_filepath}: File exists. Aborting."
+    fi
+
+    # Restore the file
+    gunzip -c <(dd if="${backup_filepath}" bs=1M) > "${restore_filepath}"
+}       
+
+BACKUP_FILEPATH=$1
+RESTORE_FILEPATH=$2
+
+restore "${BACKUP_FILEPATH}" "${RESTORE_FILEPATH}"

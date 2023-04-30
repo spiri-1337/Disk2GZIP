@@ -1,0 +1,52 @@
+#! /bin/bash
+
+# function to print usage of this script
+function synopsis() {
+    printf 'Synopsis: %s <readable file> [destination file]\n' "${0##*/}"
+}
+
+# error function to display an error message and exits the program with unsuccessful return code
+function die() {
+    printf 'Error: %s\n' "$1" >&2
+    synopsis >&2
+    exit 1
+}
+
+# function to create a GZIP compressed image of a readable file
+function backup() {
+    local filepath filename dest_filepath
+
+    filepath=$(realpath -- "$1")    # get a clean filepath from the file you want to bacup
+    filename=${filepath##*/}        # get the filename from filepath 
+    dest_filepath=$2
+
+    # The name of the backup filepath will be either automatically generated or specified by the user
+    if [[ -z "${dest_filepath}" ]]; then
+        dest_filepath=$(realpath -- "./${filename}.img.gz")
+    fi
+
+    # Abort if the destination backup filepath already exists
+    if [[ -e "${dest_filepath}" ]]; then
+        die "${dest_filepath}: File exists. Aborting."
+    fi
+
+    # Create a GZIP compressed image of the file in the current directory
+    gzip -c < <(dd if="${filepath}" status=progress bs=1M) > "${dest_filepath}"
+}
+
+
+# Check for command line errors. There are one to two arguments allowed
+if (( $# != 1 && $# != 2 )); then
+    synopsis >&2
+    exit 1
+fi
+
+DRIVE_FILPATH=$1
+BACKUP_FILEPATH=$2
+
+# Abort if the filepath to backup is not in readable state
+if [[ ! -r "${DRIVE_FILPATH}" ]]; then
+    die "${DRIVE_FILPATH}: Not readable or need to be root."
+fi
+
+backup "${DRIVE_FILPATH}" "${BACKUP_FILEPATH}"
